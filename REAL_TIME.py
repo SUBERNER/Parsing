@@ -7,7 +7,8 @@ from Coloring import highlight_excel_sections # Found online for coloring excel 
 # PUT DEMO FILE HERE
 # PUT DEMO FILE HERE
 # PUT DEMO FILE HERE
-files = [os.getcwd() + "\\DEMO\\auto-20250403-0032-de_dust2-Counter-Strike_2.dem"]
+files = [os.getcwd() + "\\DEMO\\better_TEST.dem"]
+chunks = 50000  # how many ticks each file will stored when created and the combine when done
 
 fields = ["start_balance",
               "balance",
@@ -145,40 +146,33 @@ fields = [
     "kills_total", "deaths_total", "assists_total", "alive_time_total",
     "headshot_kills_total", "ace_rounds_total", "4k_rounds_total", "3k_rounds_total",
     "damage_total", "objective_total", "utility_damage_total", "enemies_flashed_total",
-    "equipment_value_total", "money_saved_total", "kill_reward_total", "cash_earned_total"
-]
+    "equipment_value_total", "money_saved_total", "kill_reward_total", "cash_earned_total"]
 
 for file in files:
     parser = DemoParser(file)
-
     all_ticks_df = parser.parse_ticks(fields)
 
-    # export to excel
-    excel_file = os.path.basename(file) + ".xlsx"
-    with pd.ExcelWriter(excel_file, engine="openpyxl") as writer:
-        # player_activate_df.to_excel(writer, sheet_name="Player Activate", index=False)
-        # player_connect_df.to_excel(writer, sheet_name="Player Connect", index=False)
-        # begin_new_match_df.to_excel(writer, sheet_name="Begin New", index=False)
-        all_ticks_df.to_excel(writer, sheet_name="All", index=False)
+    num_chunks = (len(all_ticks_df) + chunks - 1) // chunks
+    base_filename = os.path.basename(file).replace(".dem", "")
 
-    # reloads file
-    wb = load_workbook(excel_file)
-    for sheet in wb.sheetnames:
-        ws = wb[sheet]
-        for col in ws.columns:
-            max_length = max((len(str(cell.value)) for cell in col if cell.value), default=0)
-            ws.column_dimensions[col[0].column_letter].width = max_length + 2
+    for i in range(num_chunks):
+        chunk_df = all_ticks_df.iloc[i * chunks:(i + 1) * chunks]
+        chunk_file = f"{base_filename}_part{i + 1}.xlsx"
 
-    # colors sections
-    highlight_excel_sections(wb)
+        with pd.ExcelWriter(chunk_file, engine="openpyxl") as writer:
+            chunk_df.to_excel(writer, sheet_name="All", index=False)
 
-    # saves file
-    wb.save(excel_file)
-    wb.close()
+        # Load, resize, color, and save
+        wb = load_workbook(chunk_file)
+        for sheet in wb.sheetnames:
+            ws = wb[sheet]
+            for col in ws.columns:
+                max_length = max((len(str(cell.value)) for cell in col if cell.value), default=0)
+                ws.column_dimensions[col[0].column_letter].width = max_length + 2
 
-    print("PARSER DONE")
-    print("PARSER DONE")
-    print("PARSER DONE")
-    print("PARSER DONE")
-    print("PARSER DONE")
+        highlight_excel_sections(wb)
+        wb.save(chunk_file)
+        wb.close()
+
+    print(f"{base_filename} → {num_chunks} chunks done.")
 
